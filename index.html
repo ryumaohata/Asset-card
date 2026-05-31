@@ -1,0 +1,1213 @@
+# Asset-card
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>アセットカード</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Noto Sans JP Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- ★ Gun.js 追加 -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Noto Sans JP"', 'sans-serif'] },
+                    colors: {
+                        earth: { bg: '#181e1a', card: '#202722', accent: '#a1b399', secondary: '#e2cd8a', text: '#e8efea', textMuted: '#84968a', border: '#2e3830' },
+                        warm: { bg: '#f5f0e6', card: '#fdfaf6', text: '#3d405b' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .smooth-scrolling { -webkit-overflow-scrolling: touch; }
+        @keyframes fadeIn { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        @keyframes burnOut { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 50% { transform: scale(1.05); filter: brightness(1.5) sepia(1) hue-rotate(-50deg); opacity: 0.8; } 100% { transform: scale(0.8) translateY(-20px); opacity: 0; filter: brightness(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-burn { animation: burnOut 0.6s ease forwards; pointer-events: none; }
+        
+        .asset-card { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
+        .asset-card:active { transform: scale(0.98); }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        /* テーマ切り替え用のCSS変数 */
+        :root { 
+            --modal-bg: #171717; 
+            --modal-text: #ffffff; 
+            --modal-border: rgba(255,255,255,0.1); 
+            --input-bg: rgba(255,255,255,0.05);
+        }
+        body.theme-warm { 
+            --modal-bg: #fdfaf6; 
+            --modal-text: #3d405b; 
+            --modal-border: rgba(0,0,0,0.1); 
+            --input-bg: rgba(0,0,0,0.05);
+        }
+        .theme-adaptive { background-color: var(--modal-bg) !important; color: var(--modal-text) !important; border-color: var(--modal-border) !important; }
+        .theme-input { background-color: var(--input-bg) !important; border-color: var(--modal-border) !important; color: var(--modal-text) !important; }
+    </style>
+</head>
+<body class="bg-[#121212] text-[#e8efea] min-h-screen flex flex-col justify-center items-center p-2 sm:p-6 select-none transition-colors duration-500 overflow-x-hidden">
+
+    <div class="w-full max-w-[400px] flex flex-col items-center relative h-full max-h-[850px]">
+        <div id="phone-frame" class="w-full h-full aspect-[9/19.5] rounded-[48px] border-[10px] border-[#222924] shadow-2xl relative overflow-hidden flex flex-col bg-[#181e1a] transition-colors duration-500">
+            
+            <div class="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-4.5 bg-[#222924] rounded-full z-50 flex items-center justify-between px-3">
+                <div class="w-2 h-2 rounded-full bg-blue-900/40"></div>
+                <div class="w-1.5 h-1.5 rounded-full bg-neutral-800"></div>
+            </div>
+
+            <!-- ★ 上部UI (プロフ・アクション・モジュール統合) -->
+            <div id="app-header" class="w-full shrink-0 z-20 pt-10 pb-0 flex flex-col bg-[#202722] border-b border-[#2e3830] transition-colors duration-500 shadow-md relative">
+                
+                <div class="px-4 pb-3">
+                    <div id="profile-card" class="w-full rounded-[24px] relative overflow-hidden border border-inherit shadow-lg flex flex-col bg-neutral-900 theme-adaptive">
+                        <div id="profile-bg-layer" class="absolute inset-0 bg-cover bg-center z-0" style="background-image: url('https://images.unsplash.com/photo-1501854140801-50d01698950b?q=80&w=1000'); opacity: 0.8;"></div>
+                        <div class="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-0"></div>
+                        
+                        <div class="relative z-10 p-4 flex flex-col gap-3">
+                            
+                            <!-- ★ 独立したコントロール・プラスアイコン群 (枠なしで余白に配置) -->
+                            <div class="absolute top-4 right-4 flex items-center gap-3 z-20">
+                                <button onclick="toggleTheme()" id="theme-toggle-btn" class="flex items-center justify-center transition-all active:scale-95 hover:opacity-70 drop-shadow-md text-amber-400" title="テーマ切替">
+                                    <i id="theme-icon" class="fa-solid fa-sun text-[16px]"></i>
+                                </button>
+                                <div class="relative inline-block flex items-center justify-center">
+                                    <button onclick="toggleFlagDropdown()" id="flag-select-btn" class="text-[16px] hover:opacity-70 transition-all active:scale-95 drop-shadow-md" title="ノード選択">🇯🇵</button>
+                                    <div id="flag-dropdown" class="hidden absolute right-0 mt-6 w-28 rounded-xl bg-neutral-900 border border-white/15 shadow-2xl z-50 overflow-hidden text-[10px] text-left">
+                                        <button onclick="changeFlag('🇯🇵', 'Japan Node')" class="w-full px-2 py-2 hover:bg-white/10 text-white border-b border-white/5">🇯🇵 JP Node</button>
+                                        <button onclick="changeFlag('🌐', 'Mesh Core')" class="w-full px-2 py-2 hover:bg-white/10 text-white">🌐 Mesh Net</button>
+                                    </div>
+                                </div>
+                                <button onclick="openWatchlist()" class="flex items-center justify-center transition-all active:scale-95 hover:opacity-70 drop-shadow-md text-blue-400" title="ウォッチリスト">
+                                    <i class="fa-solid fa-bookmark text-[16px]"></i>
+                                </button>
+                                <button onclick="openCreationMenu()" class="w-8 h-8 rounded-full bg-amber-500 text-black shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform ml-1" title="アセット作成">
+                                    <i class="fa-solid fa-plus text-[16px]"></i>
+                                </button>
+                            </div>
+
+                            <!-- 左上のアバターと名前 -->
+                            <div class="flex items-center gap-3 w-3/4">
+                                <button onclick="openProfileModal()" class="w-12 h-12 rounded-full overflow-hidden border-2 border-amber-400 flex items-center justify-center font-bold text-xl bg-neutral-300/20 shadow-inner transition-all hover:scale-105 shrink-0">
+                                    <div id="display-avatar" class="w-full h-full flex items-center justify-center">👤</div>
+                                </button>
+                                <div class="text-left flex-1 drop-shadow-md text-white">
+                                    <div class="font-black text-[15px] tracking-wide flex items-center gap-2">
+                                        <span class="cursor-pointer truncate max-w-[120px]" onclick="openProfileModal()" id="display-nickname">Kenji</span>
+                                    </div>
+                                    <div class="text-[9px] font-bold text-emerald-300 opacity-90 mt-0.5 truncate max-w-[120px]" id="display-peer-id">
+                                        Peer: 0x...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 残高・ウォレットバッジ -->
+                            <div class="flex gap-2 text-[10px] font-bold mt-1 text-white">
+                                <div onclick="openTokenDetailModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-black/50 hover:bg-black/70 rounded-full border border-white/10 text-amber-400 cursor-pointer shadow-sm">
+                                    <span>🪙</span><span id="txt-tkn" class="tracking-wide">1,000 jeni</span>
+                                </div>
+                                <div onclick="openWalletModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-black/50 hover:bg-black/70 rounded-full border border-white/10 text-emerald-400 cursor-pointer shadow-sm" title="マイウォレット">
+                                    <span><i class="fa-solid fa-wallet"></i></span><span id="txt-assets" class="tracking-wide">0枚</span>
+                                </div>
+                            </div>
+
+                            <!-- 中段アクションスロット -->
+                            <div class="grid grid-cols-4 gap-2 mt-2 pt-3 border-t border-white/10">
+                                <button onclick="openChatList()" class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 flex flex-col items-center justify-center gap-1 text-white active:scale-95 transition-all" title="チャット"><i class="fa-solid fa-comment text-emerald-400 text-[14px]"></i><span class="text-[8px] font-bold opacity-80">Chat</span></button>
+                                <button onclick="openCallModal()" class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 flex flex-col items-center justify-center gap-1 text-white active:scale-95 transition-all" title="通話"><i class="fa-solid fa-phone text-blue-400 text-[14px]"></i><span class="text-[8px] font-bold opacity-80">Call</span></button>
+                                <button onclick="openFriendsFeed()" class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 flex flex-col items-center justify-center gap-1 text-white active:scale-95 transition-all" title="コミュニティ"><i class="fa-solid fa-user-group text-purple-400 text-[14px]"></i><span class="text-[8px] font-bold opacity-80">Community</span></button>
+                                <button onclick="triggerDirectGift('')" class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 flex flex-col items-center justify-center gap-1 text-white active:scale-95 transition-all" title="jeni・カードを贈る"><i class="fa-solid fa-gift text-amber-400 text-[14px]"></i><span class="text-[8px] font-bold opacity-80">Gift</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 横スクロールモジュール -->
+                <div id="module-slider" class="flex gap-2.5 overflow-x-auto px-4 pb-3 hide-scrollbar snap-x transition-opacity duration-300 w-full">
+                    <button onclick="selectModule(6)" id="mod-btn-6" class="snap-center shrink-0 px-4 py-2 rounded-full border border-earth-accent bg-earth-accent/10 text-earth-accent font-black text-[11px] card-active"><i class="fa-solid fa-cart-shopping mr-1"></i> Bazaar</button>
+                    <button onclick="selectModule(1)" id="mod-btn-1" class="snap-center shrink-0 px-4 py-2 rounded-full border border-earth-border bg-earth-card text-earth-text opacity-70 font-bold text-[11px]"><i class="fa-solid fa-music text-blue-500 mr-1"></i> Music</button>
+                    <button onclick="selectModule(2)" id="mod-btn-2" class="snap-center shrink-0 px-4 py-2 rounded-full border border-earth-border bg-earth-card text-earth-text opacity-70 font-bold text-[11px]"><i class="fa-solid fa-video text-red-500 mr-1"></i> Video</button>
+                    <button onclick="selectModule(4)" id="mod-btn-4" class="snap-center shrink-0 px-4 py-2 rounded-full border border-earth-border bg-earth-card text-earth-text opacity-70 font-bold text-[11px]"><i class="fa-solid fa-image text-amber-500 mr-1"></i> Picture</button>
+                    <button onclick="selectModule(3)" id="mod-btn-3" class="snap-center shrink-0 px-4 py-2 rounded-full border border-earth-border bg-earth-card text-earth-text opacity-70 font-bold text-[11px]"><i class="fa-solid fa-book-open text-amber-600 mr-1"></i> Journal</button>
+                    <button onclick="selectModule(5)" id="mod-btn-5" class="snap-center shrink-0 px-4 py-2 rounded-full border border-earth-border bg-earth-card text-earth-text opacity-70 font-bold text-[11px]"><i class="fa-solid fa-box-archive text-purple-500 mr-1"></i> Gov</button>
+                </div>
+            </div>
+
+            <!-- メインスクロール領域 -->
+            <div id="app-body" class="flex-1 overflow-y-auto smooth-scrolling p-4 flex flex-col gap-5 z-0 pb-10 hide-scrollbar relative bg-inherit">
+                <div id="module-content-1" class="module-view hidden animate-fade-in"><div id="music-list-container" class="flex flex-col gap-4"></div></div>
+                <div id="module-content-2" class="module-view hidden animate-fade-in"><div id="video-list-container" class="flex flex-col gap-4"></div></div>
+                <div id="module-content-3" class="module-view hidden animate-fade-in"><div id="journal-list-container" class="flex flex-col gap-4"></div></div>
+                <div id="module-content-4" class="module-view hidden animate-fade-in"><div id="picture-list-container" class="flex flex-col gap-4"></div></div>
+                <div id="module-content-5" class="module-view hidden animate-fade-in"><div id="governance-opinions-feed" class="flex flex-col gap-4"></div></div>
+                <div id="module-content-6" class="module-view animate-fade-in text-left"><div id="bazaar-list-container" class="flex flex-col gap-4"></div></div>
+            </div>
+
+            <!-- フッター -->
+            <div id="app-footer" class="h-6 flex items-center justify-center bg-black/10 z-20 shrink-0">
+                <div class="w-1/3 h-1 bg-current opacity-30 rounded-full"></div>
+            </div>
+
+            <!-- ★ アセット種別選択モーダル (プラスボタンから) -->
+            <div id="create-selection-modal" class="modal-box absolute inset-0 z-[65] flex flex-col justify-end hidden animate-fade-in bg-black/80 backdrop-blur-sm">
+                <div class="w-full bg-neutral-900 rounded-t-[32px] p-6 pb-12 shadow-2xl border-t border-white/10 theme-adaptive transform transition-transform">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-black text-lg flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> アセットを作成</h3>
+                        <button onclick="closeModal('create-selection-modal')" class="w-8 h-8 rounded-full bg-current/10 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="openCreatorModal(6)" class="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col items-center gap-2 active:scale-95 transition-all text-emerald-500">
+                            <i class="fa-solid fa-cart-shopping text-2xl"></i><span class="font-bold text-[11px]">Bazaar (現物)</span>
+                        </button>
+                        <button onclick="openCreatorModal(1)" class="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-col items-center gap-2 active:scale-95 transition-all text-blue-500">
+                            <i class="fa-solid fa-music text-2xl"></i><span class="font-bold text-[11px]">Music</span>
+                        </button>
+                        <button onclick="openCreatorModal(2)" class="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col items-center gap-2 active:scale-95 transition-all text-red-500">
+                            <i class="fa-solid fa-video text-2xl"></i><span class="font-bold text-[11px]">Video</span>
+                        </button>
+                        <button onclick="openCreatorModal(4)" class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col items-center gap-2 active:scale-95 transition-all text-amber-500">
+                            <i class="fa-solid fa-image text-2xl"></i><span class="font-bold text-[11px]">Picture</span>
+                        </button>
+                        <button onclick="openCreatorModal(3)" class="p-4 rounded-2xl bg-orange-600/10 border border-orange-600/20 flex flex-col items-center gap-2 active:scale-95 transition-all text-orange-600">
+                            <i class="fa-solid fa-book-open text-2xl"></i><span class="font-bold text-[11px]">Journal</span>
+                        </button>
+                        <button onclick="openCreatorModal(5)" class="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex flex-col items-center gap-2 active:scale-95 transition-all text-purple-500">
+                            <i class="fa-solid fa-box-archive text-2xl"></i><span class="font-bold text-[11px]">Governance</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ★ 新アセット作成モーダル -->
+            <div id="creator-modal" class="modal-box absolute inset-0 z-[70] flex flex-col hidden animate-fade-in theme-adaptive overflow-y-auto hide-scrollbar">
+                <div class="p-4 flex items-center justify-between sticky top-0 bg-inherit backdrop-blur-md z-10 border-b border-current opacity-95">
+                    <span id="creator-modal-title" class="font-black text-sm flex items-center gap-2"><i class="fa-solid fa-pen"></i> 作成</span>
+                    <button onclick="closeModal('creator-modal')" class="w-8 h-8 rounded-full bg-current/10 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="p-5 flex flex-col gap-4">
+                    <!-- メディア -->
+                    <div id="creator-media-area" class="flex flex-col gap-1.5 p-3 rounded-xl bg-current/5 border border-current">
+                        <label class="text-[11px] font-bold opacity-75">メディアのアップロード</label>
+                        <div class="flex items-center gap-2">
+                            <input type="file" id="creator-media-input" class="hidden" onchange="handleMediaFileUpload(event)">
+                            <button onclick="document.getElementById('creator-media-input').click()" class="py-2 px-3 bg-current/10 rounded-lg font-bold text-[11px] hover:bg-current/20 flex items-center justify-center gap-2"><i class="fa-solid fa-upload"></i> ファイルを選択</button>
+                            <span id="creator-media-file-name" class="text-[10px] opacity-60 truncate">未選択</span>
+                        </div>
+                    </div>
+
+                    <!-- 背景画像 -->
+                    <div class="flex flex-col gap-1.5 p-3 rounded-xl bg-current/5 border border-current">
+                        <label class="text-[11px] font-bold opacity-75 flex justify-between">カード背景画像 <span id="creator-bg-upload-badge" class="hidden text-emerald-500"><i class="fa-solid fa-check"></i> 選択済</span></label>
+                        <input type="file" id="creator-bg-input" class="hidden" accept="image/*" onchange="handleBgFileUpload(event)">
+                        <button onclick="document.getElementById('creator-bg-input').click()" class="py-2.5 bg-current/10 rounded-lg font-bold text-[11px] hover:bg-current/20 flex items-center justify-center gap-2"><i class="fa-solid fa-image"></i> 背景画像を設定する</button>
+                    </div>
+
+                    <!-- タイトル・価格・在庫 -->
+                    <div class="flex flex-col gap-3">
+                        <input id="creator-title" type="text" placeholder="タイトル" class="w-full bg-current/5 border border-current rounded-xl px-3 py-3 text-[13px] outline-none font-bold theme-input placeholder-current">
+                        <div class="flex gap-2">
+                            <div class="flex-1 relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] opacity-60 font-bold">価格(jeni)</span>
+                                <input id="creator-price" type="number" value="10" class="w-full bg-current/5 border border-current rounded-xl pl-16 pr-3 py-3 text-[13px] outline-none font-bold theme-input">
+                            </div>
+                            <div id="creator-supply-area" class="flex-1 relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] opacity-60 font-bold">発行枚数</span>
+                                <input id="creator-supply" type="number" value="10" min="1" class="w-full bg-current/5 border border-current rounded-xl pl-16 pr-3 py-3 text-[13px] outline-none font-bold theme-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 位置情報 -->
+                    <div class="flex flex-col gap-1.5 p-3 rounded-xl bg-current/5 border border-current">
+                        <label class="text-[11px] font-bold opacity-75">位置情報 (任意)</label>
+                        <div class="flex gap-2">
+                            <button onclick="getLocation()" class="px-3 py-2 bg-blue-500/20 text-blue-500 border border-blue-500/30 rounded-lg font-bold text-[10px] hover:bg-blue-500/30 active:scale-95"><i class="fa-solid fa-location-crosshairs"></i> 現在地を取得</button>
+                            <div id="location-display" class="hidden flex-1 bg-current/10 rounded-lg px-2 py-2 text-[10px] font-bold flex items-center text-blue-500 truncate"></div>
+                        </div>
+                    </div>
+
+                    <textarea id="creator-note" placeholder="詳細説明..." class="w-full bg-current/5 border border-current rounded-xl p-3 text-[12px] outline-none h-24 resize-none font-bold theme-input placeholder-current"></textarea>
+                    
+                    <button onclick="executeMint()" class="w-full py-3.5 bg-amber-500 text-black text-[13px] font-black rounded-xl mt-2 active:scale-95 shadow-lg"><i class="fa-solid fa-paper-plane"></i> この内容で作成する</button>
+                </div>
+            </div>
+
+            <!-- ★ My Wallet (モジュール別タブ付き) -->
+            <div id="wallet-modal" class="modal-box absolute inset-0 z-[65] flex flex-col hidden animate-fade-in theme-adaptive overflow-y-auto hide-scrollbar">
+                <div class="p-4 flex items-center justify-between sticky top-0 bg-inherit backdrop-blur-md z-10 border-b border-current opacity-95">
+                    <span class="font-black text-sm flex items-center gap-2 text-emerald-500"><i class="fa-solid fa-wallet"></i> My Wallet</span>
+                    <button onclick="closeModal('wallet-modal')" class="w-8 h-8 rounded-full bg-current/10 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="pt-4 pb-2">
+                    <p class="text-[11px] font-bold opacity-70 mb-3 px-4">獲得したアセットです。店舗やイベントで「消費(使う)」ことができます。</p>
+                    
+                    <!-- モジュール別タブ -->
+                    <div id="wallet-tabs" class="flex gap-2 overflow-x-auto hide-scrollbar mb-4 px-4">
+                        <button onclick="renderWallet('all')" id="wallet-tab-all" class="px-3 py-1.5 rounded-full font-bold text-[10px] bg-emerald-500 text-black shrink-0 shadow-sm">すべて</button>
+                        <button onclick="renderWallet('rwa')" id="wallet-tab-rwa" class="px-3 py-1.5 rounded-full font-bold text-[10px] border border-current opacity-70 shrink-0">Bazaar</button>
+                        <button onclick="renderWallet('music')" id="wallet-tab-music" class="px-3 py-1.5 rounded-full font-bold text-[10px] border border-current opacity-70 shrink-0">Music</button>
+                        <button onclick="renderWallet('video')" id="wallet-tab-video" class="px-3 py-1.5 rounded-full font-bold text-[10px] border border-current opacity-70 shrink-0">Video</button>
+                        <button onclick="renderWallet('journal')" id="wallet-tab-journal" class="px-3 py-1.5 rounded-full font-bold text-[10px] border border-current opacity-70 shrink-0">Journal</button>
+                        <button onclick="renderWallet('picture')" id="wallet-tab-picture" class="px-3 py-1.5 rounded-full font-bold text-[10px] border border-current opacity-70 shrink-0">Picture</button>
+                        <button onclick="renderWallet('skill')" id="wallet-tab-skill" class="px-3 py-1.5 rounded-full font-bold text-[10px] border border-current opacity-70 shrink-0">Gov</button>
+                    </div>
+
+                    <div id="wallet-cards-container" class="flex flex-col gap-3 pb-10 px-4"></div>
+                </div>
+            </div>
+
+            <!-- ★ プロフィール編集モーダル -->
+            <div id="profile-modal" class="modal-box absolute inset-0 z-[70] flex flex-col justify-center p-6 hidden animate-fade-in text-left theme-adaptive">
+                <div class="rounded-3xl p-5 border border-current bg-inherit flex flex-col gap-4 relative shadow-2xl opacity-95">
+                    <button onclick="closeProfileModal()" class="absolute top-4 right-4 opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    <div class="flex items-center gap-2 border-b border-current pb-2"><i class="fa-solid fa-user-gear text-amber-500"></i><h4 class="font-black text-sm text-amber-500">プロフィール編集</h4></div>
+                    
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold opacity-70 block">1. アイコン画像を選択</label>
+                        <div class="flex items-center gap-3">
+                            <div id="edit-avatar-preview" class="w-14 h-14 rounded-full border-2 border-current bg-current/10 overflow-hidden flex items-center justify-center text-2xl font-bold">👤</div>
+                            <div class="flex-1">
+                                <input type="file" id="profile-avatar-uploader" class="hidden" accept="image/*" onchange="handleAvatarUpload(event)">
+                                <button onclick="document.getElementById('profile-avatar-uploader').click()" class="px-4 py-2 bg-current/10 rounded-xl font-bold text-[11px] hover:bg-current/20 w-full text-center shadow-sm">画像をアップロード</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold opacity-70 block">2. ニックネーム (重複不可)</label>
+                        <input id="edit-nickname-input" type="text" placeholder="例: Kenji" class="w-full bg-current/5 border border-current rounded-xl px-3 py-2.5 text-[12px] font-bold outline-none theme-input">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold opacity-70 block">3. 自己紹介文</label>
+                        <textarea id="edit-bio-input" placeholder="あなたの活動や興味を書きましょう" class="w-full bg-current/5 border border-current rounded-xl px-3 py-2 text-[11px] outline-none h-16 resize-none theme-input"></textarea>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold opacity-70 block">4. カバー背景画像</label>
+                        <div class="flex items-center gap-3">
+                            <div id="edit-bg-preview" class="w-16 h-10 rounded-lg border border-current bg-current/10 overflow-hidden bg-cover bg-center"></div>
+                            <div class="flex-1">
+                                <input type="file" id="profile-bg-uploader" class="hidden" accept="image/*" onchange="handleProfileBgUpload(event)">
+                                <button onclick="document.getElementById('profile-bg-uploader').click()" class="px-4 py-2 bg-current/10 rounded-xl font-bold text-[11px] hover:bg-current/20 w-full text-center shadow-sm">画像を選択</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="saveProfileData()" class="w-full py-3 bg-amber-500 text-black text-[12px] font-black rounded-xl shadow-lg mt-2 active:scale-95">保存する</button>
+                </div>
+            </div>
+
+            <!-- フルスクリーン没入ビューア -->
+            <div id="immersive-viewer" class="modal-box absolute inset-0 z-[60] flex flex-col hidden animate-fade-in theme-adaptive backdrop-blur-xl">
+                <div class="flex justify-between items-center p-4 z-10 w-full absolute top-0 left-0 bg-gradient-to-b from-black/50 to-transparent">
+                    <span class="text-[10px] font-bold tracking-wider opacity-60 bg-black/30 px-2.5 py-1 rounded-full border border-white/10 text-white">ASSET VIEWER</span>
+                    <button onclick="closeViewer()" class="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"><i class="fa-solid fa-xmark text-white"></i></button>
+                </div>
+                
+                <div class="flex-1 w-full h-full flex flex-col items-center p-6 overflow-y-auto hide-scrollbar pt-16 relative z-0">
+                    <div id="viewer-bg-blur" class="absolute inset-0 bg-cover bg-center opacity-20 blur-2xl z-[-1]"></div>
+
+                    <div class="w-full max-w-[320px] flex flex-col gap-5 pb-10">
+                        <div id="viewer-media-container" class="w-full rounded-2xl overflow-hidden shadow-xl border border-current opacity-90 shrink-0"></div>
+
+                        <div class="w-full flex flex-col gap-2">
+                            <h2 id="viewer-title" class="font-black text-2xl leading-tight text-center">アセットタイトル</h2>
+                            <div class="flex items-center justify-center mt-1">
+                                <button onclick="openCreatorProfileFromViewer()" class="flex items-center gap-2 bg-current/5 hover:bg-current/10 px-4 py-2 rounded-full border border-current opacity-80 active:scale-95 transition-all shadow-sm">
+                                    <div id="viewer-author-avatar" class="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center overflow-hidden">👤</div>
+                                    <div class="text-left flex flex-col">
+                                        <span class="text-[8px] opacity-60 leading-none">Creator</span>
+                                        <span id="viewer-author-name" class="text-[12px] font-bold leading-none mt-0.5">Owner</span>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-[10px] opacity-40 ml-1"></i>
+                                </button>
+                            </div>
+                            <div id="viewer-meta-info" class="flex justify-center gap-3 mt-1 hidden">
+                                <span id="viewer-location" class="text-[10px] font-bold bg-blue-500/10 text-blue-500 px-2 py-1 rounded border border-blue-500/20"><i class="fa-solid fa-location-dot"></i> <span></span></span>
+                                <span id="viewer-supply" class="text-[10px] font-bold bg-amber-500/10 text-amber-500 px-2 py-1 rounded border border-amber-500/20"><i class="fa-solid fa-cubes"></i> 残り <span></span></span>
+                            </div>
+
+                            <p id="viewer-desc" class="text-[13px] opacity-90 leading-relaxed mt-3 whitespace-pre-wrap text-left bg-current/5 p-4 rounded-xl border border-current"></p>
+                        </div>
+                        
+                        <div class="flex items-center gap-3 justify-center w-full shrink-0">
+                            <button onclick="shareAsset()" class="w-12 h-12 rounded-full bg-current/10 hover:bg-current/20 flex items-center justify-center transition-all border border-current shadow-md active:scale-95" title="シェア"><i class="fa-solid fa-share-nodes text-lg"></i></button>
+                            <button onclick="toggleWatchlistViewer()" id="viewer-watchlist-btn" class="w-12 h-12 rounded-full bg-current/10 hover:bg-current/20 flex items-center justify-center transition-all border border-current shadow-md active:scale-95" title="ウォッチリスト"><i class="fa-solid fa-bookmark text-lg"></i></button>
+                            <button onclick="tipCreatorFromViewer()" class="w-12 h-12 rounded-full bg-amber-500/20 hover:bg-amber-500/30 flex items-center justify-center transition-all border border-amber-500/50 text-amber-500 shadow-md active:scale-95" title="jeniを贈る"><i class="fa-solid fa-gift text-lg"></i></button>
+                            <button onclick="focusCommentInput()" class="w-12 h-12 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 flex items-center justify-center transition-all border border-emerald-500/50 text-emerald-500 shadow-md active:scale-95" title="コメント"><i class="fa-solid fa-pen text-lg"></i></button>
+                        </div>
+                        
+                        <div class="w-full mt-2 flex flex-col gap-3">
+                            <h3 class="text-[12px] font-bold border-b border-current pb-1.5 opacity-70">コメント</h3>
+                            <div id="public-comments-container" class="flex flex-col gap-2"></div>
+                            
+                            <div class="flex items-center gap-2 mt-2 bg-current/5 p-2 rounded-xl border border-current opacity-90">
+                                <input type="text" id="viewer-comment-input" placeholder="コメントを書く..." class="flex-1 bg-transparent text-[12px] font-bold outline-none px-2 text-inherit theme-input">
+                                <button onclick="sendViewerComment()" class="text-emerald-500 p-2 rounded-lg hover:bg-current/10 active:scale-95"><i class="fa-solid fa-paper-plane text-lg"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ★ ギフトモーダル (トークンとカードを切替可能) -->
+            <div id="gift-modal" class="modal-box absolute inset-0 z-[65] flex flex-col justify-center p-6 hidden animate-fade-in text-left theme-adaptive backdrop-blur-md">
+                 <div class="rounded-3xl p-5 border border-current bg-inherit opacity-95 flex flex-col gap-3 shadow-2xl">
+                    <div class="flex justify-between items-center border-b border-current pb-2">
+                        <span class="font-black text-sm text-amber-500 flex items-center gap-2"><i class="fa-solid fa-gift"></i> ギフトを贈る</span>
+                        <button onclick="closeModal('gift-modal')" class="opacity-50 bg-current/10 w-8 h-8 rounded-full flex justify-center items-center"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+
+                    <div class="flex gap-2 border-b border-current pb-2 mb-2">
+                        <button onclick="setGiftMode('token')" id="gift-tab-token" class="flex-1 py-1.5 text-[12px] font-bold border-b-2 border-amber-500 text-amber-500 transition-all">🪙 jeniを贈る</button>
+                        <button onclick="setGiftMode('card')" id="gift-tab-card" class="flex-1 py-1.5 text-[12px] font-bold border-b-2 border-transparent opacity-50 transition-all">🎴 カードを贈る</button>
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold opacity-70 block">贈り先のニックネーム</label>
+                        <input id="gift-dest-input" type="text" placeholder="ユーザー名" class="w-full bg-current/5 border border-current rounded-xl px-3 py-2.5 text-[12px] font-bold outline-none focus:border-amber-500 theme-input">
+                    </div>
+                    
+                    <div id="gift-token-area" class="space-y-1 mt-1">
+                        <label class="text-[10px] font-bold opacity-70 block">贈る量 (jeni)</label>
+                        <input id="gift-token-amount" type="number" value="10" class="w-full bg-current/5 border border-current rounded-xl px-3 py-2.5 text-[12px] font-bold outline-none focus:border-amber-500 text-center theme-input">
+                    </div>
+
+                    <div id="gift-card-area" class="space-y-1 mt-1 hidden">
+                        <label class="text-[10px] font-bold opacity-70 block">贈るアセットカード (ウォレット内)</label>
+                        <select id="gift-card-select" class="w-full bg-current/5 border border-current rounded-xl px-3 py-2.5 text-[12px] font-bold outline-none focus:border-amber-500 theme-input">
+                        </select>
+                    </div>
+
+                    <button onclick="executeDirectGift()" class="w-full py-3.5 bg-amber-500 text-black text-[12px] font-black rounded-xl shadow-lg hover:bg-amber-400 active:scale-95 mt-3"><i class="fa-solid fa-paper-plane"></i> 確定する</button>
+                </div>
+            </div>
+
+            <!-- ★ クリエイター・プロフィール -->
+            <div id="creator-profile-modal" class="modal-box absolute inset-0 z-[65] flex flex-col hidden animate-fade-in theme-adaptive overflow-y-auto hide-scrollbar">
+                <div class="p-4 flex items-center justify-between sticky top-0 bg-inherit backdrop-blur-md z-10 border-b border-current opacity-95">
+                    <span class="font-bold text-[12px]">プロフィール</span>
+                    <button onclick="closeModal('creator-profile-modal')" class="w-8 h-8 flex items-center justify-center bg-current/10 rounded-full"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="flex flex-col items-center p-6 gap-4">
+                    <div class="w-20 h-20 rounded-full bg-current/5 border-2 border-current flex items-center justify-center text-4xl shadow-lg overflow-hidden">
+                        <div id="creator-modal-avatar" class="w-full h-full flex justify-center items-center">👤</div>
+                    </div>
+                    <div class="text-center">
+                        <h3 id="creator-modal-name" class="font-black text-xl">Name</h3>
+                        <p id="creator-modal-peer" class="text-[9px] font-mono opacity-50 mt-1">Peer: 0x...</p>
+                    </div>
+                    <p id="creator-modal-bio" class="text-[12px] text-center font-bold opacity-80 max-w-[280px]">自己紹介文</p>
+                    
+                    <div class="flex gap-3 mt-2 w-full max-w-[260px]">
+                        <button onclick="addFriendFromCreatorProfile()" id="btn-add-friend" class="flex-1 py-2.5 rounded-xl bg-emerald-500 text-black font-black text-[11px] active:scale-95 transition-colors flex items-center justify-center gap-1.5"><i class="fa-solid fa-user-plus"></i> 友達追加</button>
+                        <button onclick="tipCreatorFromProfile()" class="flex-1 py-2.5 rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30 font-black text-[11px] active:scale-95 transition-colors flex items-center justify-center gap-1.5"><i class="fa-solid fa-gift"></i> 支援(Tip)</button>
+                    </div>
+                </div>
+                <div class="px-4 pb-6 flex-1 flex flex-col">
+                    <h4 class="text-[11px] font-bold border-b border-current pb-2 mb-3 opacity-70">発行したアセット</h4>
+                    <div id="creator-assets-list" class="flex flex-col gap-3"></div>
+                </div>
+            </div>
+
+            <!-- ★ コミュニティ / チャット / 通話 / ウォッチ / トースト -->
+            <div id="friends-feed-modal" class="modal-box absolute inset-0 z-[55] flex flex-col hidden animate-fade-in text-left theme-adaptive"><div class="flex justify-between items-center border-b border-current p-4 shrink-0 bg-inherit opacity-95"><span class="text-sm font-black flex items-center gap-2"><i class="fa-solid fa-user-group text-purple-500"></i> コミュニティ</span><button onclick="closeModal('friends-feed-modal')" class="opacity-50 w-8 h-8 flex items-center justify-center bg-current/10 rounded-full"><i class="fa-solid fa-xmark"></i></button></div><div class="px-4 py-3 border-b border-current bg-current/5 shrink-0"><div id="community-friends-row" class="flex gap-3 overflow-x-auto hide-scrollbar"></div></div><div id="friends-feed-container" class="flex-1 overflow-y-auto flex flex-col p-4 gap-4 hide-scrollbar pb-10 bg-inherit"></div></div>
+            <div id="chat-modal" class="modal-box absolute inset-0 z-[55] flex flex-col hidden animate-fade-in theme-adaptive"><div id="chat-list-screen" class="flex flex-col h-full"><div class="flex justify-between items-center p-4 border-b border-current bg-inherit opacity-95 shrink-0"><span class="text-sm font-black flex items-center gap-2"><i class="fa-solid fa-comment text-emerald-500"></i> メッセージ</span><button onclick="closeModal('chat-modal')" class="opacity-50 w-8 h-8 flex items-center justify-center bg-current/10 rounded-full"><i class="fa-solid fa-xmark"></i></button></div><div id="chat-friends-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 hide-scrollbar"></div></div><div id="chat-room-screen" class="hidden flex flex-col h-full bg-inherit"><div class="flex justify-between items-center p-4 border-b border-current bg-inherit opacity-95 shrink-0"><div class="flex items-center gap-3"><button onclick="backToChatList()" class="w-8 h-8 bg-current/10 rounded-full flex items-center justify-center active:scale-95"><i class="fa-solid fa-chevron-left"></i></button><div class="flex items-center gap-2"><div id="chat-room-avatar" class="w-8 h-8 flex items-center justify-center rounded-full bg-current/10 overflow-hidden">👤</div><span id="chat-room-name" class="text-sm font-bold">Name</span></div></div><button onclick="startVoiceCall()" class="w-9 h-9 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center active:scale-95"><i class="fa-solid fa-phone"></i></button></div><div id="chat-messages-area" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 hide-scrollbar text-[12px]"></div><div class="p-3 border-t border-current shrink-0 flex gap-2"><input type="text" id="chat-room-input" placeholder="メッセージ..." class="flex-1 bg-current/5 border border-current rounded-full px-4 py-2.5 font-bold outline-none theme-input"><button onclick="sendPrivateMessage()" class="w-10 h-10 rounded-full bg-emerald-500 text-black flex items-center justify-center active:scale-95"><i class="fa-solid fa-paper-plane"></i></button></div></div><div id="call-active-screen" class="hidden absolute inset-0 bg-neutral-950 text-white flex flex-col justify-between py-10 z-[100]"><div class="flex flex-col items-center gap-4 mt-16"><div class="w-28 h-28 rounded-full bg-blue-500/10 border-2 border-blue-500 flex items-center justify-center text-6xl shadow-xl animate-pulse overflow-hidden"><div id="call-active-avatar" class="w-full h-full flex justify-center items-center">👤</div></div><h4 class="font-black text-2xl mt-4" id="call-active-name">Name</h4><p class="text-[11px] font-bold text-blue-400 flex items-center gap-1 mt-2 bg-blue-500/10 px-3 py-1 rounded-full"><i class="fa-solid fa-lock"></i> E2E 暗号化通話</p></div><button onclick="endVoiceCall()" class="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center text-2xl mx-auto active:scale-95 mb-10 shadow-2xl"><i class="fa-solid fa-phone-slash"></i></button></div></div>
+            <div id="call-modal" class="modal-box absolute inset-0 z-[55] flex flex-col p-4 hidden animate-fade-in theme-adaptive"><div class="flex justify-between items-center border-b border-current pb-3 shrink-0 bg-inherit px-4 rounded-t-xl mt-2"><span class="text-sm font-black text-blue-500 flex items-center gap-2"><i class="fa-solid fa-phone"></i> 通話発信</span><button onclick="closeCallModal()" class="opacity-50 w-8 h-8 flex items-center justify-center bg-current/10 rounded-full"><i class="fa-solid fa-xmark"></i></button></div><div id="call-selection-list" class="flex-1 overflow-y-auto p-2 flex flex-col gap-2 hide-scrollbar"></div></div>
+            <div id="watchlist-modal" class="modal-box absolute inset-0 z-[55] flex flex-col p-4 hidden animate-fade-in text-left theme-adaptive"><div class="flex justify-between items-center border-b border-current pb-3 shrink-0"><span class="text-sm font-black flex items-center gap-2"><i class="fa-solid fa-bookmark text-blue-500"></i> ウォッチリスト</span><button onclick="closeModal('watchlist-modal')" class="opacity-50 w-8 h-8 flex items-center justify-center bg-current/10 rounded-full"><i class="fa-solid fa-xmark"></i></button></div><div id="watchlist-container" class="flex-1 overflow-y-auto flex flex-col mt-4 gap-4 hide-scrollbar pb-10"></div></div>
+            <div id="token-detail-modal" class="modal-box absolute inset-0 z-[40] flex flex-col p-5 hidden animate-fade-in text-left theme-adaptive"><div class="flex justify-between items-center border-b border-current pb-2 mb-4"><span class="text-sm font-black text-amber-500">jeni Wallet Insights</span><button onclick="closeModal('token-detail-modal')" class="opacity-50"><i class="fa-solid fa-xmark"></i></button></div></div>
+
+            <div id="processing" class="absolute inset-0 bg-black/80 z-[100] flex flex-col justify-center items-center gap-3 hidden backdrop-blur-sm"><div class="w-8 h-8 border-3 border-amber-500/20 border-t-amber-500 rounded-full animate-spin"></div><p id="process-text" class="font-bold text-xs text-amber-500 text-center px-6">処理中...</p></div>
+
+            <div id="app-toast" class="absolute bottom-10 left-1/2 -translate-x-1/2 bg-neutral-900 border border-emerald-500/50 text-white px-5 py-3 rounded-2xl text-[12px] font-bold shadow-2xl z-[110] flex items-center gap-2 transition-all duration-300 opacity-0 pointer-events-none w-[85%] text-center justify-center">
+                <span id="app-toast-text"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- オーディオプレイヤー -->
+    <audio id="global-player" class="hidden"></audio>
+
+    <script>
+        // --- 状態管理 ---
+        window.currentTheme = 'earth';
+        
+        window.userNickname = "Kenji";
+        window.userAvatar = "👤"; // Base64 or Emoji
+        window.userBio = "自然を愛するクリエイターです。";
+        window.userPeerId = "0x" + Math.random().toString(16).slice(2, 10).toUpperCase();
+        window.userBalance = 1000;
+        window.currentBackgroundUrl = "https://images.unsplash.com/photo-1501854140801-50d01698950b?q=80&w=1000";
+        
+        window.selectedModuleId = 6; 
+        window.selectedRwaType = 'rwa';
+        
+        window.watchlist = []; 
+        window.currentViewingAssetId = null;
+        window.currentChatFriend = null;
+        window.currentCommunityFriendFilter = null;
+        window.currentWalletFilter = 'all';
+        window.currentGiftMode = 'token';
+        
+        window.uploadedMediaBase64 = "";
+        window.uploadedBgBase64 = "";
+        window.currentLocationStr = "";
+
+        // --- ダミーデータ ---
+        window.existingUsers = [
+            { name: "Farmer_S", avatar: "👩‍🌾", peerId: "0xFS829", bio: "無農薬野菜を育てています。" },
+            { name: "SoundArchitect", avatar: "🎧", peerId: "0xSA114", bio: "環境音を取り入れた音楽。" },
+            { name: "Bakery_Haru", avatar: "👨‍🍳", peerId: "0xBH990", bio: "天然酵母のパン屋。" },
+            { name: "Philosopher_Soil", avatar: "🧙‍♂️", peerId: "0xPS777", bio: "持続可能な経済の探求。" }
+        ];
+        
+        window.friendsList = [ "Farmer_S", "SoundArchitect", "Bakery_Haru" ];
+        window.chatData = { "Farmer_S": [{ sender: "Farmer_S", text: "今日の大根は甘いよ！" }] };
+
+        // DB (supply, location含む)
+        window.dbItems = [
+            { id: 1, type: 'rwa', title: '特製スパイスカレー', price: 12.0, supply: 5, location: "東京都 渋谷区", author: 'Bakery_Haru', owner: 'Bakery_Haru', note: "特製スパイスのカレーです。", isShared: true, comments: [] },
+            { id: 2, type: 'rwa', title: '朝採り大根 (3本)', price: 4.5, supply: 10, location: "千葉県 農場", author: 'Farmer_S', owner: 'Farmer_S', note: "農場から直送される大根。", isShared: false, comments: [] },
+            { id: 3, type: 'music', title: 'Ambient Waves', price: 5.0, author: 'SoundArchitect', owner: 'SoundArchitect', note: "自然と調和する音源。", isShared: true, comments: [] },
+            { id: 5, type: 'rwa', title: '天然カンパーニュ', price: 6.0, supply: 3, author: 'Bakery_Haru', owner: 'Bakery_Haru', note: "自家製天然酵母のパン。", isShared: false, comments: [] },
+            { id: 6, type: 'skill', title: '実物アセットの重視', price: 3.0, author: 'Philosopher_Soil', owner: 'Philosopher_Soil', note: "対等に資源を交換する提言。", isShared: true, comments: [] }
+        ];
+
+        // --- ★ P2P (Gun.js) 初期化 ---
+        // 外部のパブリックノードを利用してP2Pネットワークを構築
+        window.gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+        window.assetsDB = window.gun.get('jeni_assets_v3_core_fixed'); 
+
+        window.assetsDB.map().on((data, id) => {
+            if (data && data.id) {
+                // Gun.jsのメタデータを削除して扱いやすくする
+                const cleanData = { ...data };
+                delete cleanData._;
+                
+                // コメント配列等のネストデータはJSON文字列で同期されるためパース
+                if (typeof cleanData.comments === 'string') {
+                    try { cleanData.comments = JSON.parse(cleanData.comments); } catch(e) { cleanData.comments = []; }
+                }
+                
+                // ローカルデータをP2Pデータで上書き・追加
+                const idx = window.dbItems.findIndex(i => String(i.id) === String(data.id));
+                if (idx > -1) {
+                    window.dbItems[idx] = { ...window.dbItems[idx], ...cleanData };
+                } else {
+                    window.dbItems.unshift(cleanData);
+                }
+                
+                // UIの自動再描画
+                window.renderAllModules();
+                if(!document.getElementById('wallet-modal').classList.contains('hidden')) {
+                    window.renderWallet(window.currentWalletFilter);
+                }
+                
+                // ビューアを開いている場合のコメントのリアルタイム反映
+                if(window.currentViewingAssetId && String(window.currentViewingAssetId) === String(data.id)) {
+                    const item = window.dbItems.find(i => String(i.id) === String(data.id));
+                    if(item) {
+                        window.renderPublicComments(item);
+                        // もし供給量が変更されていればビューアにも反映
+                        const supEl = document.getElementById('viewer-supply');
+                        if(item.supply !== undefined && !item.isPurchased && supEl) {
+                            supEl.querySelector('span').innerText = item.supply;
+                        }
+                    }
+                }
+            } else if (data === null) {
+                 // カードが消去(Burn)された場合の同期
+                 const idx = window.dbItems.findIndex(i => String(i.id) === String(id));
+                 if(idx > -1) {
+                     window.dbItems.splice(idx, 1);
+                     window.renderAllModules();
+                     if(!document.getElementById('wallet-modal').classList.contains('hidden')) {
+                         window.renderWallet(window.currentWalletFilter);
+                     }
+                 }
+            }
+        });
+
+        // --- 初期化 ---
+        window.onload = function() {
+            window.updateProfileUI();
+            window.selectModule(6);
+            window.renderAllModules();
+            
+            // アプリ起動時に既存ダミーデータを一度P2Pに同期させる（テスト用）
+            window.dbItems.forEach(item => {
+                const syncData = { ...item };
+                syncData.comments = JSON.stringify(syncData.comments || []);
+                window.assetsDB.get(String(item.id)).put(syncData);
+            });
+        };
+
+        window.updateProfileUI = function() {
+            document.getElementById('display-nickname').innerText = window.userNickname;
+            document.getElementById('display-peer-id').innerText = `Peer: ${window.userPeerId}`;
+            document.getElementById('txt-tkn').innerText = window.userBalance.toLocaleString() + " jeni";
+            
+            const avHTML = window.userAvatar.startsWith('data:image') ? `<img src="${window.userAvatar}" class="w-full h-full object-cover">` : window.userAvatar;
+            document.getElementById('display-avatar').innerHTML = avHTML;
+            document.getElementById('edit-avatar-preview').innerHTML = avHTML;
+            
+            document.getElementById('profile-bg-layer').style.backgroundImage = `url('${window.currentBackgroundUrl}')`;
+            document.getElementById('edit-bg-preview').style.backgroundImage = `url('${window.currentBackgroundUrl}')`;
+        };
+
+        // --- ユーティリティ ---
+        window.showToast = function(msg) {
+            const toast = document.getElementById('app-toast');
+            document.getElementById('app-toast-text').innerHTML = msg;
+            toast.style.opacity = "1"; toast.style.transform = "translate(-50%, -8px)";
+            setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translate(-50%, 0px)"; }, 3500);
+        };
+        window.showProcessing = function(text) { document.getElementById('process-text').innerText = text; document.getElementById('processing').classList.remove('hidden'); };
+        window.hideProcessing = function() { document.getElementById('processing').classList.add('hidden'); };
+        window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
+
+        window.getUserData = function(name) {
+            if(name === window.userNickname) return { name, avatar: window.userAvatar, bio: window.userBio, peerId: window.userPeerId };
+            return window.existingUsers.find(u => u.name === name) || { name, avatar: "👤", bio: "プロフィールがありません", peerId: "0x000" };
+        };
+        window.getAvatarHTML = function(avatarData) {
+            return avatarData.startsWith('data:image') ? `<img src="${avatarData}" class="w-full h-full object-cover">` : avatarData;
+        };
+
+        // --- テーマ切替 ---
+        window.toggleTheme = function() { 
+            window.currentTheme = window.currentTheme === 'warm' ? 'earth' : 'warm'; 
+            const body = document.body; 
+            const themeIcon = document.getElementById('theme-icon'); 
+            const frame = document.getElementById('phone-frame');
+            const header = document.getElementById('app-header');
+            
+            if (window.currentTheme === 'warm') { 
+                body.classList.remove('bg-[#121212]', 'text-[#e8efea]');
+                body.classList.add('theme-warm', 'bg-[#f5f0e6]', 'text-[#3d405b]');
+                themeIcon.className = "fa-solid fa-leaf text-[16px] text-emerald-600"; 
+                frame.className = "w-full h-full aspect-[9/19.5] rounded-[48px] border-[10px] border-[#ecdac2] shadow-2xl relative overflow-hidden flex flex-col bg-[#fdfaf6] transition-colors duration-500";
+                header.className = "w-full shrink-0 z-20 pt-10 pb-0 flex flex-col bg-[#f7f2ea] border-b border-[#eaddcd] transition-colors duration-500 shadow-md relative";
+            } else { 
+                body.classList.remove('theme-warm', 'bg-[#f5f0e6]', 'text-[#3d405b]');
+                body.classList.add('bg-[#121212]', 'text-[#e8efea]');
+                themeIcon.className = "fa-solid fa-sun text-[16px] text-amber-400"; 
+                frame.className = "w-full h-full aspect-[9/19.5] rounded-[48px] border-[10px] border-[#222924] shadow-2xl relative overflow-hidden flex flex-col bg-[#181e1a] transition-colors duration-500";
+                header.className = "w-full shrink-0 z-20 pt-10 pb-0 flex flex-col bg-[#202722] border-b border-[#2e3830] transition-colors duration-500 shadow-md relative";
+            } 
+            window.selectModule(window.selectedModuleId);
+            window.renderAllModules();
+            window.showToast("🎨 テーマを切替えました"); 
+        };
+
+        // --- プロフィール作成・編集 ---
+        window.openProfileModal = function() { 
+            document.getElementById('edit-nickname-input').value = window.userNickname;
+            document.getElementById('edit-bio-input').value = window.userBio;
+            document.getElementById('profile-modal').classList.remove('hidden'); 
+        };
+        window.closeProfileModal = function() { document.getElementById('profile-modal').classList.add('hidden'); };
+        
+        window.handleAvatarUpload = function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    window.userAvatar = e.target.result;
+                    document.getElementById('edit-avatar-preview').innerHTML = `<img src="${window.userAvatar}" class="w-full h-full object-cover">`;
+                    window.showToast("アバター画像を設定しました");
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        window.handleProfileBgUpload = function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    window.currentBackgroundUrl = e.target.result;
+                    document.getElementById('edit-bg-preview').style.backgroundImage = `url('${window.currentBackgroundUrl}')`;
+                    window.showToast("背景画像を設定しました");
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        window.saveProfileData = function() {
+            const newNick = document.getElementById('edit-nickname-input').value.trim();
+            if(!newNick) return window.showToast("ニックネームを入力してください");
+            if(newNick !== window.userNickname && window.existingUsers.some(u => u.name.toLowerCase() === newNick.toLowerCase())) {
+                return window.showToast("⚠️ このニックネームは既に使用されています");
+            }
+
+            window.userNickname = newNick;
+            window.userBio = document.getElementById('edit-bio-input').value.trim();
+            window.userPeerId = "0x" + Math.random().toString(16).slice(2, 10).toUpperCase();
+
+            window.updateProfileUI();
+            window.closeProfileModal();
+            window.showToast("✅ プロフィールを更新しました");
+            window.renderAllModules();
+        };
+
+        // --- アセット作成関連 ---
+        window.openCreationMenu = function() { document.getElementById('create-selection-modal').classList.remove('hidden'); };
+        
+        window.openCreatorModal = function(modId) {
+            window.closeModal('create-selection-modal');
+            window.selectedModuleId = modId;
+            
+            const titleEl = document.getElementById('creator-modal-title');
+            const mediaArea = document.getElementById('creator-media-area');
+            const supplyArea = document.getElementById('creator-supply-area');
+            const p = document.getElementById('creator-price'); 
+            
+            window.uploadedMediaBase64 = ""; window.uploadedBgBase64 = ""; window.currentLocationStr = "";
+            document.getElementById('creator-media-file-name').innerText = "未選択";
+            document.getElementById('creator-bg-upload-badge').classList.add('hidden');
+            document.getElementById('location-display').classList.add('hidden');
+            
+            mediaArea.classList.add('hidden');
+            p.parentElement.classList.remove('hidden'); 
+            supplyArea.classList.add('hidden'); 
+            
+            if (modId === 6) { window.selectedRwaType = 'rwa'; titleEl.innerHTML = '<i class="fa-solid fa-cart-shopping"></i> Bazaar (現物) 作成'; supplyArea.classList.remove('hidden'); p.value = "10"; } 
+            else if (modId === 1) { window.selectedRwaType = 'music'; titleEl.innerHTML = '<i class="fa-solid fa-music"></i> Music 作成'; mediaArea.classList.remove('hidden'); p.value = "5"; } 
+            else if (modId === 2) { window.selectedRwaType = 'video'; titleEl.innerHTML = '<i class="fa-solid fa-video"></i> Video 作成'; mediaArea.classList.remove('hidden'); p.value = "5"; } 
+            else if (modId === 4) { window.selectedRwaType = 'picture'; titleEl.innerHTML = '<i class="fa-solid fa-image"></i> Picture 投稿'; mediaArea.classList.remove('hidden'); p.parentElement.classList.add('hidden'); p.value = "0"; } 
+            else if (modId === 3) { window.selectedRwaType = 'journal'; titleEl.innerHTML = '<i class="fa-solid fa-book-open"></i> Journal 作成'; p.parentElement.classList.add('hidden'); p.value = "0"; } 
+            else if (modId === 5) { window.selectedRwaType = 'skill'; titleEl.innerHTML = '<i class="fa-solid fa-box-archive"></i> Governance 提言'; p.value = "3"; }
+            
+            document.getElementById('creator-modal').classList.remove('hidden');
+        };
+
+        window.handleMediaFileUpload = function(event) {
+            const file = event.target.files[0];
+            if (file) { document.getElementById('creator-media-file-name').innerText = file.name; const r = new FileReader(); r.onload = function(e) { window.uploadedMediaBase64 = e.target.result; }; r.readAsDataURL(file); }
+        };
+        window.handleBgFileUpload = function(event) {
+            const file = event.target.files[0];
+            if (file) { const reader = new FileReader(); reader.onload = function(e) { window.uploadedBgBase64 = e.target.result; document.getElementById('creator-bg-upload-badge').classList.remove('hidden'); window.showToast("🎨 カード背景画像を設定しました"); }; reader.readAsDataURL(file); }
+        };
+        window.getLocation = function() {
+            window.showProcessing("位置情報を取得中...");
+            setTimeout(() => {
+                window.currentLocationStr = "東京都 渋谷区 (Demo)";
+                document.getElementById('location-display').innerText = window.currentLocationStr;
+                document.getElementById('location-display').classList.remove('hidden');
+                window.hideProcessing();
+            }, 600);
+        };
+
+        window.executeMint = function() {
+            const t = document.getElementById('creator-title').value.trim();
+            const p = parseFloat(document.getElementById('creator-price').value);
+            const s = parseInt(document.getElementById('creator-supply').value);
+            
+            if (!t) return window.showToast("タイトルを入力してください");
+            
+            window.showProcessing("ネットワークへ発行中...");
+            setTimeout(() => {
+                window.hideProcessing();
+                const newItem = { 
+                    id: Date.now(), type: window.selectedRwaType, title: t, price: isNaN(p) ? 0 : p, 
+                    author: window.userNickname, owner: window.userNickname, 
+                    isShared: false, note: document.getElementById('creator-note').value, comments: [],
+                    bgImage: window.uploadedBgBase64 || "", location: window.currentLocationStr
+                };
+                if(window.selectedRwaType === 'rwa') newItem.supply = isNaN(s) || s < 1 ? 1 : s;
+                
+                // ★ Gun.js へ送信 (P2P同期)
+                const syncData = { ...newItem };
+                syncData.comments = JSON.stringify(syncData.comments || []);
+                window.assetsDB.get(String(newItem.id)).put(syncData);
+
+                // ローカルにも追加 (Gunからの受信を待たずに即時反映)
+                const exists = window.dbItems.some(i => i.id === newItem.id);
+                if(!exists) window.dbItems.unshift(newItem);
+                
+                window.showToast(`✨ アセット「${t}」を発行しました！`);
+                document.getElementById('creator-title').value = ""; document.getElementById('creator-note').value = "";
+                window.closeModal('creator-modal');
+                window.selectModule(window.selectedModuleId);
+                window.renderAllModules();
+            }, 600);
+        };
+
+        // --- モジュール・カード描画 ---
+        window.selectModule = function(id) {
+            window.selectedModuleId = id;
+            document.querySelectorAll('.module-view').forEach(view => view.classList.add('hidden'));
+            const activeContent = document.getElementById(`module-content-${id}`);
+            if(activeContent) activeContent.classList.remove('hidden');
+            for (let i = 1; i <= 6; i++) {
+                const btn = document.getElementById(`mod-btn-${i}`); if (!btn) continue;
+                if (i === id) btn.className = "snap-center shrink-0 px-4 py-2 rounded-full border border-earth-accent bg-earth-accent/10 text-earth-accent font-black text-[11px] card-active"; 
+                else btn.className = "snap-center shrink-0 px-4 py-2 rounded-full border border-earth-border bg-earth-card text-earth-text opacity-70 font-bold text-[11px]"; 
+            }
+        };
+
+        window.getAssetLabel = function(type) {
+            if (type === 'music') return { text: "Music (音楽)", icon: '<i class="fa-solid fa-music"></i>', color: "from-blue-800 to-blue-950" };
+            if (type === 'video') return { text: "Video (動画)", icon: '<i class="fa-solid fa-video"></i>', color: "from-red-800 to-red-950" };
+            if (type === 'journal') return { text: "Journal (記事)", icon: '<i class="fa-solid fa-book-open"></i>', color: "from-amber-700 to-amber-950" };
+            if (type === 'picture') return { text: "Picture (画像)", icon: '<i class="fa-solid fa-image"></i>', color: "from-emerald-700 to-emerald-950" };
+            if (type === 'skill') return { text: "Governance", icon: '<i class="fa-solid fa-scale-balanced"></i>', color: "from-purple-700 to-purple-950" };
+            return { text: "Bazaar (現物)", icon: '<i class="fa-solid fa-cart-shopping"></i>', color: "from-neutral-700 to-neutral-900" };
+        };
+
+        window.createCardElement = function(item, isWalletView = false) {
+            const isBookmarked = window.watchlist.includes(item.id);
+            const bmColor = isBookmarked ? "text-blue-400 bg-blue-500/20 border-blue-500/30" : "text-white bg-black/40 border-white/10";
+            const labelData = window.getAssetLabel(item.type);
+            const authorData = window.getUserData(item.author);
+
+            const div = document.createElement('div');
+            div.className = `asset-card relative w-full aspect-[1.5/1] rounded-[24px] overflow-hidden shadow-2xl border border-white/15 bg-gradient-to-br ${labelData.color} flex flex-col mb-4 shrink-0 text-white`;
+            if(!isWalletView) div.onclick = () => window.openImmersiveViewer(item.id);
+            
+            let bgLayer = item.bgImage ? `<div class="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay pointer-events-none" style="background-image: url('${item.bgImage}');"></div>` : '';
+
+            // ウォレットビューか 通常ビューか
+            let actionHtml = '';
+            if(isWalletView && item.type === 'rwa') {
+                actionHtml = `<button onclick="redeemAsset(${item.id}, event)" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black text-[12px] font-black py-2.5 rounded-xl active:scale-95 transition-colors shadow-sm"><i class="fa-solid fa-qrcode"></i> チケットを使う</button>`;
+            } else if (isWalletView) {
+                actionHtml = `<button class="w-full bg-black/30 text-white text-[10px] font-black py-2.5 rounded-xl cursor-default opacity-50">保有済</button>`;
+            } else {
+                actionHtml = `<button onclick="triggerPayment(${item.price > 0 ? item.price : 1.5}, ${item.id}, event)" class="w-full bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-black py-2.5 rounded-xl active:scale-95 transition-colors shadow-sm">交換する</button>`;
+            }
+
+            let metaHtml = '';
+            if(item.location) metaHtml += `<span class="text-[8px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30"><i class="fa-solid fa-location-dot"></i> ${item.location}</span>`;
+            if(item.supply !== undefined && !isWalletView) metaHtml += `<span class="text-[8px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30"><i class="fa-solid fa-cubes"></i> 残:${item.supply}</span>`;
+
+            div.innerHTML = `
+                ${bgLayer}
+                <div class="relative z-10 p-4 flex flex-col justify-between h-full text-white pointer-events-auto">
+                    <div class="flex justify-between items-start w-full">
+                        <span class="text-[9px] px-2.5 py-1 rounded-full bg-black/50 border border-white/20 font-bold tracking-wider flex items-center gap-1.5 shadow-sm">${labelData.icon} ${labelData.text}</span>
+                        ${!isWalletView ? `
+                        <div class="flex gap-1.5">
+                            <button onclick="shareAsset(${item.id}); event.stopPropagation();" class="w-8 h-8 rounded-full bg-black/40 border border-white/10 flex items-center justify-center hover:bg-white/20 transition-colors shadow-md"><i class="fa-solid fa-share-nodes text-[12px]"></i></button>
+                            <button onclick="toggleWatchlist(${item.id}, event)" class="w-8 h-8 rounded-full border flex items-center justify-center transition-colors shadow-md ${bmColor}"><i class="fa-solid fa-bookmark text-[12px]"></i></button>
+                        </div>` : ''}
+                    </div>
+                    <div class="flex-1 flex flex-col justify-center text-left min-h-0 mt-2">
+                        <h3 class="font-black text-[16px] line-clamp-2 leading-tight drop-shadow-md">${item.title}</h3>
+                        <div class="flex items-center gap-2 mt-1.5 flex-wrap">${metaHtml}</div>
+                        
+                        <div class="flex items-center gap-1.5 mt-2">
+                            <button onclick="openCreatorProfile('${authorData.name}'); event.stopPropagation();" class="flex items-center gap-1.5 bg-black/40 hover:bg-black/60 px-2.5 py-1 rounded-full border border-white/10 transition-colors shadow-sm">
+                                <div class="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center text-[10px] bg-white/10">${window.getAvatarHTML(authorData.avatar)}</div>
+                                <span class="text-[10px] font-bold opacity-90">${authorData.name}</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 pt-3 border-t border-white/10 mt-2">
+                        <div class="flex flex-col text-left">
+                            <span class="text-[8px] opacity-60 uppercase font-black tracking-widest">Value</span>
+                            <span class="font-mono text-[14px] font-black text-amber-400 drop-shadow-sm">${item.price > 0 ? item.price.toFixed(1) + ' jeni' : 'FREE'}</span>
+                        </div>
+                        <div class="flex-1 max-w-[140px] z-10">${actionHtml}</div>
+                    </div>
+                </div>
+            `;
+            return div;
+        };
+
+        window.renderAllModules = function() {
+            const containers = {
+                bazaar: document.getElementById('bazaar-list-container'), music: document.getElementById('music-list-container'), video: document.getElementById('video-list-container'), journal: document.getElementById('journal-list-container'), picture: document.getElementById('picture-list-container'), governance: document.getElementById('governance-opinions-feed')
+            };
+            Object.values(containers).forEach(c => { if(c) c.innerHTML = ""; });
+
+            window.dbItems.filter(i => !i.isPurchased).forEach(item => {
+                const el = window.createCardElement(item);
+                if (item.type === 'rwa' && containers.bazaar) containers.bazaar.appendChild(el);
+                else if (item.type === 'music' && containers.music) containers.music.appendChild(el);
+                else if (item.type === 'video' && containers.video) containers.video.appendChild(el);
+                else if (item.type === 'journal' && containers.journal) containers.journal.appendChild(el);
+                else if (item.type === 'picture' && containers.picture) containers.picture.appendChild(el);
+                else if (item.type === 'skill' && containers.governance) containers.governance.appendChild(el);
+            });
+            window.updateAssetCount();
+        };
+
+        window.updateAssetCount = function() {
+            const myCards = window.dbItems.filter(i => i.owner === window.userNickname && i.isPurchased);
+            document.getElementById('txt-assets').innerText = myCards.length + "枚";
+        };
+
+        // --- 決済と消費 (Wallet) ---
+        window.triggerPayment = function(cost, originalId, event) {
+            if(event) event.stopPropagation();
+            
+            const originalItem = window.dbItems.find(i => String(i.id) === String(originalId));
+            if(!originalItem) return;
+            
+            if(originalItem.supply !== undefined && originalItem.supply <= 0) {
+                return window.showToast("⚠️ 残り在庫がありません");
+            }
+            if(originalItem.owner === window.userNickname && originalItem.supply === undefined) {
+                return window.showToast("すでに保有しています");
+            }
+            if(window.userBalance + (-cost) < 0) {
+                return window.showToast("jeniが不足しています");
+            }
+
+            window.showProcessing("取引を検証中...");
+            setTimeout(() => {
+                window.hideProcessing();
+                window.userBalance -= cost;
+                document.getElementById('txt-tkn').innerText = window.userBalance.toLocaleString() + " jeni";
+                
+                if(originalItem.supply !== undefined) {
+                    originalItem.supply -= 1;
+                    // ★ 元アイテムの在庫減少をP2P同期
+                    window.assetsDB.get(String(originalItem.id)).put({ supply: originalItem.supply });
+                }
+                
+                // 自分用にコピーを発行（ウォレットに入る）
+                const myItem = { ...originalItem, id: Date.now(), owner: window.userNickname, isShared: false, supply: undefined, isPurchased: true };
+                window.dbItems.push(myItem);
+
+                // ★ P2Pに新しく保有したアセットを同期
+                const syncItem = { ...myItem };
+                syncItem.comments = JSON.stringify(syncItem.comments || []);
+                window.assetsDB.get(String(myItem.id)).put(syncItem);
+
+                window.showToast(`✨ 『${originalItem.title}』を獲得しました！ウォレットに追加されました💳`);
+                window.renderAllModules();
+            }, 800);
+        };
+
+        // ★ ウォレット（モジュール別タブ付き）
+        window.openWalletModal = function() {
+            window.renderWallet(window.currentWalletFilter);
+            document.getElementById('wallet-modal').classList.remove('hidden');
+        };
+
+        window.renderWallet = function(filter = 'all') {
+            window.currentWalletFilter = filter;
+            ['all','rwa','music','video','journal','picture','skill'].forEach(id => {
+                const btn = document.getElementById('wallet-tab-' + id);
+                if(!btn) return;
+                if(filter === id) btn.className = "px-3 py-1.5 rounded-full font-bold text-[10px] bg-emerald-500 text-black shrink-0 shadow-sm transition-colors";
+                else btn.className = "px-3 py-1.5 rounded-full font-bold text-[10px] border border-current opacity-70 shrink-0 transition-colors";
+            });
+
+            const container = document.getElementById('wallet-cards-container');
+            container.innerHTML = "";
+            let myItems = window.dbItems.filter(i => i.owner === window.userNickname && i.isPurchased);
+            if(filter !== 'all') myItems = myItems.filter(i => i.type === filter);
+            
+            if(myItems.length === 0) {
+                container.innerHTML = '<div class="text-center py-10 opacity-50"><i class="fa-solid fa-folder-open text-4xl mb-3"></i><p class="text-[11px] font-bold">該当するアセットはありません</p></div>';
+            } else {
+                myItems.forEach(item => {
+                    const el = window.createCardElement(item, true); // true = ウォレットモード
+                    container.appendChild(el);
+                });
+            }
+        };
+
+        window.redeemAsset = function(id, event) {
+            if(event) event.stopPropagation();
+            const idx = window.dbItems.findIndex(i => String(i.id) === String(id));
+            if(idx > -1) {
+                const cardEl = event.target.closest('.asset-card');
+                if(cardEl) cardEl.classList.add('animate-burn'); 
+                
+                setTimeout(() => {
+                    window.dbItems.splice(idx, 1); 
+                    // ★ P2Pネットワークからも削除（nullで上書き）
+                    window.assetsDB.get(String(id)).put(null); 
+                    
+                    window.showToast("🔥 チケットを消費(Burn)して現実世界で利用しました！");
+                    window.updateAssetCount();
+                    window.renderWallet(window.currentWalletFilter); 
+                }, 600);
+            }
+        };
+
+        // --- ★ ギフト (トークン or カード切替対応) ---
+        window.triggerDirectGift = function(targetName = '') { 
+            window.setGiftMode('token');
+            document.getElementById('gift-modal').classList.remove('hidden'); 
+            document.getElementById('gift-dest-input').value = targetName; 
+        };
+        
+        window.setGiftMode = function(mode) {
+            window.currentGiftMode = mode;
+            document.getElementById('gift-tab-token').className = mode === 'token' ? "flex-1 py-1.5 text-[12px] font-bold border-b-2 border-amber-500 text-amber-500 transition-all" : "flex-1 py-1.5 text-[12px] font-bold border-b-2 border-transparent opacity-50 transition-all";
+            document.getElementById('gift-tab-card').className = mode === 'card' ? "flex-1 py-1.5 text-[12px] font-bold border-b-2 border-amber-500 text-amber-500 transition-all" : "flex-1 py-1.5 text-[12px] font-bold border-b-2 border-transparent opacity-50 transition-all";
+            
+            document.getElementById('gift-token-area').classList.toggle('hidden', mode !== 'token');
+            document.getElementById('gift-card-area').classList.toggle('hidden', mode !== 'card');
+
+            if(mode === 'card') {
+                const select = document.getElementById('gift-card-select');
+                select.innerHTML = "";
+                const myItems = window.dbItems.filter(i => i.owner === window.userNickname && i.isPurchased);
+                if(myItems.length === 0) {
+                    select.innerHTML = '<option value="">送れるカードがありません</option>';
+                } else {
+                    myItems.forEach(item => { select.innerHTML += `<option value="${item.id}">${item.title} (${item.type})</option>`; });
+                }
+            }
+        };
+
+        window.executeDirectGift = function() {
+            const dest = document.getElementById('gift-dest-input').value.trim();
+            if(!dest) return window.showToast("贈り先のニックネームを入力してください");
+
+            if(window.currentGiftMode === 'token') {
+                const val = parseFloat(document.getElementById('gift-token-amount').value);
+                if(isNaN(val) || val <= 0) return window.showToast("正しく入力してください");
+                
+                if(window.userBalance - val >= 0) {
+                    window.userBalance -= val;
+                    document.getElementById('txt-tkn').innerText = window.userBalance.toLocaleString() + " jeni";
+                    window.closeModal('gift-modal');
+                    window.showToast(`🎁 <span class="text-emerald-300">${dest}</span> さんへ ${val} jeni 贈りました！`);
+                } else {
+                    window.showToast("jeniが不足しています");
+                }
+            } else {
+                const cardId = document.getElementById('gift-card-select').value;
+                if(!cardId) return window.showToast("送るカードを選択してください");
+
+                const itemIndex = window.dbItems.findIndex(i => String(i.id) === String(cardId));
+                if(itemIndex > -1) {
+                    window.dbItems[itemIndex].owner = dest; 
+                    // ★ 所有権の移転をP2P同期
+                    window.assetsDB.get(String(cardId)).put({ owner: dest }); 
+                    
+                    window.closeModal('gift-modal');
+                    window.showToast(`🎁 <span class="text-emerald-300">${dest}</span> さんへカードを贈りました！`);
+                    window.updateAssetCount();
+                }
+            }
+        };
+
+        // --- クリエイター・プロフィール ---
+        window.openCreatorProfileFromViewer = function() {
+            const item = window.dbItems.find(i => String(i.id) === String(window.currentViewingAssetId));
+            if(!item) return;
+            window.openCreatorProfile(item.author);
+        };
+        window.openCreatorProfile = function(name) {
+            const user = window.getUserData(name);
+            document.getElementById('creator-modal-avatar').innerHTML = window.getAvatarHTML(user.avatar);
+            document.getElementById('creator-modal-name').innerText = user.name;
+            document.getElementById('creator-modal-peer').innerText = `Peer: ${user.peerId}`;
+            document.getElementById('creator-modal-bio').innerText = user.bio;
+            
+            const btnAdd = document.getElementById('btn-add-friend');
+            if(name === window.userNickname) {
+                btnAdd.style.display = 'none';
+            } else {
+                btnAdd.style.display = 'flex';
+                if(window.friendsList.includes(name)) {
+                    btnAdd.innerHTML = '<i class="fa-solid fa-check"></i> 友達です'; btnAdd.className = "flex-1 py-2.5 rounded-xl bg-neutral-700 text-white font-black text-[11px] flex items-center justify-center gap-1.5 opacity-50 cursor-default"; btnAdd.onclick = null;
+                } else {
+                    btnAdd.innerHTML = '<i class="fa-solid fa-user-plus"></i> 友達追加'; btnAdd.className = "flex-1 py-2.5 rounded-xl bg-emerald-500 text-black font-black text-[11px] active:scale-95 transition-colors flex items-center justify-center gap-1.5 shadow-md"; btnAdd.onclick = () => window.addFriend(name);
+                }
+            }
+
+            const listEl = document.getElementById('creator-assets-list');
+            listEl.innerHTML = "";
+            const assets = window.dbItems.filter(i => i.author === name && !i.isPurchased);
+            if(assets.length === 0) { listEl.innerHTML = '<p class="text-[11px] opacity-50 font-bold">公開しているアセットがありません</p>'; } 
+            else {
+                assets.forEach(a => {
+                    listEl.innerHTML += `
+                    <div onclick="openImmersiveViewer(${a.id})" class="bg-current/5 border border-current p-3 rounded-xl flex justify-between items-center active:scale-95 transition-transform cursor-pointer">
+                        <div><div class="font-bold text-[12px]">${a.title}</div><div class="text-[9px] font-bold opacity-60 uppercase mt-0.5">${a.type}</div></div>
+                        <div class="font-mono text-amber-500 font-bold text-[12px]">${a.price} jeni</div>
+                    </div>`;
+                });
+            }
+            document.getElementById('creator-profile-modal').classList.remove('hidden');
+        };
+        window.addFriend = function(name) { if(!window.friendsList.includes(name)) window.friendsList.push(name); window.showToast(`🤝 ${name} を友達に追加しました`); window.openCreatorProfile(name); };
+        window.tipCreatorFromProfile = function() { const name = document.getElementById('creator-modal-name').innerText; window.closeModal('creator-profile-modal'); if(window.currentViewingAssetId) window.closeViewer(); window.triggerDirectGift(name); };
+        window.tipCreatorFromViewer = function() { const item = window.dbItems.find(i => String(i.id) === String(window.currentViewingAssetId)); if(item) { window.closeViewer(); window.triggerDirectGift(item.author); } };
+        window.tipCommenter = function(name) { window.closeViewer(); window.triggerDirectGift(name); };
+
+        // --- チャット・通話 ---
+        window.openChatList = function() {
+            const container = document.getElementById('chat-friends-list'); container.innerHTML = "";
+            window.friendsList.forEach(fname => {
+                const f = window.getUserData(fname);
+                container.innerHTML += `<button onclick="openChatRoom('${f.name}')" class="w-full bg-current/5 border border-current p-3 rounded-xl flex items-center gap-3 active:scale-95 transition-transform text-left hover:bg-current/10"><div class="w-10 h-10 rounded-full bg-current/10 flex items-center justify-center overflow-hidden text-lg shrink-0">${window.getAvatarHTML(f.avatar)}</div><div class="flex-1 min-w-0"><div class="font-bold text-[13px]">${f.name}</div><div class="text-[10px] font-bold opacity-60 truncate mt-0.5">${window.chatData[f.name] ? window.chatData[f.name][window.chatData[f.name].length-1].text : 'メッセージはありません'}</div></div></button>`;
+            });
+            document.getElementById('chat-room-screen').classList.add('hidden'); document.getElementById('chat-list-screen').classList.remove('hidden'); document.getElementById('chat-modal').classList.remove('hidden');
+        };
+        window.openChatRoom = function(name) {
+            const f = window.getUserData(name); window.currentChatFriend = f;
+            document.getElementById('chat-room-name').innerText = f.name; document.getElementById('chat-room-avatar').innerHTML = window.getAvatarHTML(f.avatar);
+            window.renderChatMessages();
+            document.getElementById('chat-list-screen').classList.add('hidden'); document.getElementById('chat-room-screen').classList.remove('hidden');
+        };
+        window.backToChatList = function() { document.getElementById('chat-room-screen').classList.add('hidden'); document.getElementById('chat-list-screen').classList.remove('hidden'); };
+        window.renderChatMessages = function() {
+            const name = window.currentChatFriend.name; const container = document.getElementById('chat-messages-area'); container.innerHTML = "";
+            const msgs = window.chatData[name] || [];
+            msgs.forEach(m => {
+                const isMe = m.sender === window.userNickname;
+                container.innerHTML += `<div class="flex ${isMe ? 'justify-end' : 'justify-start'}"><div class="${isMe ? 'bg-emerald-600 text-black' : 'bg-current/10 border border-current'} px-3 py-2 rounded-2xl max-w-[80%] break-words shadow-sm font-bold">${m.text}</div></div>`;
+            });
+            container.scrollTop = container.scrollHeight;
+        };
+        window.sendPrivateMessage = function() {
+            const input = document.getElementById('chat-room-input'); const text = input.value.trim();
+            if(!text || !window.currentChatFriend) return;
+            const name = window.currentChatFriend.name; if(!window.chatData[name]) window.chatData[name] = [];
+            window.chatData[name].push({ sender: window.userNickname, text }); input.value = ""; window.renderChatMessages();
+        };
+        window.openCallModal = function() {
+            const list = document.getElementById('call-selection-list'); list.innerHTML = "";
+            window.friendsList.forEach(fname => {
+                const f = window.getUserData(fname);
+                list.innerHTML += `<button onclick="initiateCall('${f.name}')" class="w-full bg-current/5 border border-current p-3 rounded-xl flex items-center gap-3 active:scale-95 transition-transform text-left"><div class="w-8 h-8 rounded-full bg-current/10 flex items-center justify-center overflow-hidden shrink-0">${window.getAvatarHTML(f.avatar)}</div><span class="font-bold text-[13px] flex-1">${f.name} に発信</span><i class="fa-solid fa-phone text-blue-500"></i></button>`;
+            });
+            document.getElementById('call-modal').classList.remove('hidden');
+        };
+        window.closeCallModal = function() { document.getElementById('call-modal').classList.add('hidden'); };
+        window.initiateCall = function(name) { window.closeCallModal(); window.currentChatFriend = window.getUserData(name); window.startVoiceCall(); };
+        window.startVoiceCall = function() {
+            if(!window.currentChatFriend) return;
+            document.getElementById('call-active-name').innerText = window.currentChatFriend.name; document.getElementById('call-active-avatar').innerHTML = window.getAvatarHTML(window.currentChatFriend.avatar);
+            document.getElementById('chat-modal').classList.remove('hidden'); document.getElementById('chat-list-screen').classList.add('hidden'); document.getElementById('chat-room-screen').classList.add('hidden'); document.getElementById('call-active-screen').classList.remove('hidden');
+        };
+        window.endVoiceCall = function() {
+            document.getElementById('call-active-screen').classList.add('hidden');
+            if(document.getElementById('chat-room-name').innerText === window.currentChatFriend?.name) document.getElementById('chat-room-screen').classList.remove('hidden');
+            else document.getElementById('chat-modal').classList.add('hidden');
+        };
+
+        // --- ウォッチリスト ---
+        window.toggleWatchlist = function(id, event) {
+            if(event) event.stopPropagation();
+            const idx = window.watchlist.indexOf(id);
+            if(idx > -1) { window.watchlist.splice(idx, 1); window.showToast("リストから外しました"); } 
+            else { window.watchlist.push(id); window.showToast("🔖 ウォッチリストに追加しました"); }
+            window.renderAllModules();
+            if(window.currentViewingAssetId === id) window.updateViewerWatchlistBtn();
+            if(!document.getElementById('watchlist-modal').classList.contains('hidden')) window.renderWatchlist();
+        };
+        window.openWatchlist = function() { window.renderWatchlist(); document.getElementById('watchlist-modal').classList.remove('hidden'); };
+        window.renderWatchlist = function() {
+            const container = document.getElementById('watchlist-container'); container.innerHTML = "";
+            const items = window.dbItems.filter(i => window.watchlist.includes(i.id) && !i.isPurchased);
+            if(items.length === 0) container.innerHTML = '<p class="text-center text-[12px] opacity-50 mt-10 font-bold">追加されたカードはありません</p>';
+            else items.forEach(item => container.appendChild(window.createCardElement(item)));
+        };
+
+        // --- コミュニティ ---
+        window.openFriendsFeed = function() { window.currentCommunityFriendFilter = null; window.renderCommunityTopRow(); window.renderCommunityFeed(); document.getElementById('friends-feed-modal').classList.remove('hidden'); };
+        window.renderCommunityTopRow = function() {
+            const row = document.getElementById('community-friends-row');
+            row.innerHTML = `<button onclick="filterCommunity(null)" class="flex flex-col items-center gap-1 shrink-0 ${window.currentCommunityFriendFilter===null ? 'opacity-100' : 'opacity-40'} transition-opacity"><div class="w-12 h-12 rounded-full bg-current/10 flex items-center justify-center text-xl border ${window.currentCommunityFriendFilter===null?'border-purple-500':'border-transparent'}">🌐</div><span class="text-[10px] font-bold">すべて</span></button>`;
+            window.friendsList.forEach(fname => {
+                const f = window.getUserData(fname); const isActive = window.currentCommunityFriendFilter === f.name;
+                row.innerHTML += `<button onclick="filterCommunity('${f.name}')" class="flex flex-col items-center gap-1 shrink-0 ${isActive ? 'opacity-100' : 'opacity-40'} transition-opacity"><div class="w-12 h-12 rounded-full bg-current/10 flex items-center justify-center text-xl border ${isActive?'border-purple-500':'border-transparent'} overflow-hidden">${window.getAvatarHTML(f.avatar)}</div><span class="text-[10px] font-bold truncate max-w-[50px]">${f.name}</span></button>`;
+            });
+        };
+        window.filterCommunity = function(name) { window.currentCommunityFriendFilter = name; window.renderCommunityTopRow(); window.renderCommunityFeed(); };
+        window.renderCommunityFeed = function() {
+            const container = document.getElementById('friends-feed-container'); container.innerHTML = "";
+            let items = window.dbItems.filter(i => (window.friendsList.includes(i.author) || i.isShared) && i.author !== window.userNickname && !i.isPurchased);
+            if(window.currentCommunityFriendFilter) items = items.filter(i => i.author === window.currentCommunityFriendFilter);
+            if(items.length === 0) { container.innerHTML = '<p class="text-center text-[12px] opacity-50 mt-10 font-bold">アセットが見つかりません</p>'; } 
+            else {
+                items.forEach(item => {
+                    const el = window.createCardElement(item);
+                    const label = document.createElement('div'); label.className = "text-[10px] font-bold text-purple-500 mb-1 flex items-center gap-1"; label.innerHTML = `<i class="fa-solid fa-share-nodes"></i> Shared by ${item.author}`;
+                    const wrapper = document.createElement('div'); wrapper.appendChild(label); wrapper.appendChild(el); container.appendChild(wrapper);
+                });
+            }
+        };
+
+        // --- ビューア & パブリックコメント ---
+        window.openImmersiveViewer = function(id) {
+            window.currentViewingAssetId = id; const item = window.dbItems.find(i => String(i.id) === String(id)); if(!item) return;
+            document.getElementById('viewer-title').innerText = item.title;
+            const author = window.getUserData(item.author);
+            document.getElementById('viewer-author-name').innerText = author.name; document.getElementById('viewer-author-avatar').innerHTML = window.getAvatarHTML(author.avatar);
+            document.getElementById('viewer-desc').innerText = item.note;
+            window.updateViewerWatchlistBtn();
+            
+            const metaInfo = document.getElementById('viewer-meta-info');
+            const locEl = document.getElementById('viewer-location');
+            const supEl = document.getElementById('viewer-supply');
+            let hasMeta = false;
+            if(item.location) { locEl.querySelector('span').innerText = item.location; locEl.classList.remove('hidden'); hasMeta = true; } else { locEl.classList.add('hidden'); }
+            if(item.supply !== undefined && !item.isPurchased) { supEl.querySelector('span').innerText = item.supply; supEl.classList.remove('hidden'); hasMeta = true; } else { supEl.classList.add('hidden'); }
+            if(hasMeta) metaInfo.classList.remove('hidden'); else metaInfo.classList.add('hidden');
+
+            const media = document.getElementById('viewer-media-container');
+            if (item.type === 'music') media.innerHTML = `<div class="w-full h-32 flex items-center justify-center bg-blue-500/20"><i class="fa-solid fa-music text-4xl text-blue-500"></i></div>`;
+            else media.innerHTML = `<div class="w-full h-32 flex items-center justify-center bg-amber-500/20"><i class="fa-solid fa-cube text-4xl text-amber-500"></i></div>`;
+            if (item.bgImage) document.getElementById('viewer-bg-blur').style.backgroundImage = `url('${item.bgImage}')`; else document.getElementById('viewer-bg-blur').style.backgroundImage = 'none';
+
+            window.renderPublicComments(item); document.getElementById('immersive-viewer').classList.remove('hidden');
+        };
+        window.closeViewer = function() { document.getElementById('immersive-viewer').classList.add('hidden'); window.currentViewingAssetId = null; };
+        window.updateViewerWatchlistBtn = function() {
+            const btn = document.getElementById('viewer-watchlist-btn'); if(!btn) return;
+            if(window.watchlist.includes(window.currentViewingAssetId)) { btn.className = "w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/50 text-blue-500 shadow-md active:scale-95 transition-all"; } 
+            else { btn.className = "w-12 h-12 rounded-full bg-current/10 hover:bg-current/20 flex items-center justify-center border border-current text-inherit shadow-md active:scale-95 transition-all"; }
+        };
+        window.toggleWatchlistViewer = function() { window.toggleWatchlist(window.currentViewingAssetId); };
+        window.shareAsset = function(id) { 
+            if(event) event.stopPropagation(); 
+            const item = window.dbItems.find(i => String(i.id) === String(id || window.currentViewingAssetId)); 
+            if(item) { 
+                item.isShared = true; 
+                // ★ P2Pにシェア状態を同期
+                window.assetsDB.get(String(item.id)).put({ isShared: true });
+                window.showToast("🔗 コミュニティにシェアしました！"); 
+            } 
+        };
+        window.focusCommentInput = function() { document.getElementById('viewer-comment-input').focus(); };
+        
+        window.renderPublicComments = function(item) {
+            const container = document.getElementById('public-comments-container'); container.innerHTML = "";
+            if(!item.comments || item.comments.length === 0) { container.innerHTML = '<p class="text-[11px] font-bold opacity-50 italic">コメントはまだありません</p>'; return; }
+            item.comments.forEach(c => {
+                container.innerHTML += `<div class="flex items-start justify-between gap-2 bg-current/5 p-3 rounded-xl border border-current"><div class="flex items-start gap-2"><div class="w-8 h-8 rounded-full bg-current/10 flex items-center justify-center overflow-hidden shrink-0">${window.getAvatarHTML(c.avatar)}</div><div><span class="text-[11px] font-bold text-emerald-500 cursor-pointer" onclick="openCreatorProfile('${c.user}')">${c.user}</span><p class="text-[12px] font-bold mt-0.5">${c.text}</p></div></div><button onclick="tipCommenter('${c.user}')" class="text-amber-500 text-[11px] font-black px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg active:scale-95 flex items-center gap-1 transition-colors"><i class="fa-solid fa-gift"></i></button></div>`;
+            });
+        };
+        window.sendViewerComment = function() {
+            const input = document.getElementById('viewer-comment-input'); const text = input.value.trim();
+            if(!text || !window.currentViewingAssetId) return;
+            const item = window.dbItems.find(i => String(i.id) === String(window.currentViewingAssetId));
+            if(!item.comments) item.comments = [];
+            item.comments.push({ user: window.userNickname, avatar: window.userAvatar, text });
+            
+            // ★ P2Pにコメントを同期 (Gun.jsで配列を扱うためJSON化)
+            window.assetsDB.get(String(item.id)).put({ comments: JSON.stringify(item.comments) });
+            
+            input.value = ""; window.renderPublicComments(item); window.showToast("コメントを投稿しました");
+        };
+
+        window.openTokenDetailModal = function() { document.getElementById('token-detail-modal').classList.remove('hidden'); };
+        window.toggleFlagDropdown = function() { document.getElementById('flag-dropdown').classList.toggle('hidden'); };
+        window.changeFlag = function(s, n) { document.getElementById('flag-select-btn').innerText = s; document.getElementById('flag-dropdown').classList.add('hidden'); window.showToast(`🛰️ ノード変更: ${n}`); };
+    </script>
+</body>
+</html>
